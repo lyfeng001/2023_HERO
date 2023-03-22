@@ -274,6 +274,7 @@ static void gimbal_relative_angle_control(fp32 *yaw, fp32 *pitch, gimbal_control
   * @retval         none
   */
 static void gimbal_motionless_control(fp32 *yaw, fp32 *pitch, gimbal_control_t *gimbal_control_set);
+static void gimbal_autoaim_control(fp32 *yaw, fp32 *pitch, gimbal_control_t *gimbal_control_set);
 
 //ÔÆÌ¨ÐÐÎª×´Ì¬»ú
 static gimbal_behaviour_e gimbal_behaviour = GIMBAL_ZERO_FORCE;
@@ -332,6 +333,11 @@ void gimbal_behaviour_mode_set(gimbal_control_t *gimbal_mode_set)
         gimbal_mode_set->gimbal_yaw_motor.gimbal_motor_mode = GIMBAL_MOTOR_ENCONDE;
         gimbal_mode_set->gimbal_pitch_motor.gimbal_motor_mode = GIMBAL_MOTOR_ENCONDE;
     }
+    else if (gimbal_behaviour == GIMBAL_AUTOAIM)
+    {
+        gimbal_mode_set->gimbal_yaw_motor.gimbal_motor_mode = GIMBAL_MOTOR_GYRO;
+        gimbal_mode_set->gimbal_pitch_motor.gimbal_motor_mode = GIMBAL_MOTOR_GYRO;
+    }
 }
 
 /**
@@ -382,7 +388,10 @@ void gimbal_behaviour_control_set(fp32 *add_yaw, fp32 *add_pitch, gimbal_control
     {
         gimbal_motionless_control(add_yaw, add_pitch, gimbal_control_set);
     }
-
+    else if (gimbal_behaviour == GIMBAL_AUTOAIM)
+    {
+        gimbal_autoaim_control(add_yaw, add_pitch, gimbal_control_set);
+    }
 }
 
 /**
@@ -508,7 +517,15 @@ static void gimbal_behavour_set(gimbal_control_t *gimbal_mode_set)
     }
     else if (switch_is_mid(gimbal_mode_set->gimbal_rc_ctrl->rc.s[GIMBAL_MODE_CHANNEL]))
     {
-        gimbal_behaviour = GIMBAL_ABSOLUTE_ANGLE;//GIMBAL_RELATIVE_ANGLE;
+    	 if ((gimbal_mode_set->gimbal_rc_ctrl->key.v & KEY_PRESSED_OFFSET_C) == KEY_PRESSED_OFFSET_C)
+        {
+            gimbal_behaviour = GIMBAL_AUTOAIM;
+        }
+        else
+        {
+            gimbal_behaviour = GIMBAL_ABSOLUTE_ANGLE;
+        }
+        
     }
     else if (switch_is_up(gimbal_mode_set->gimbal_rc_ctrl->rc.s[GIMBAL_MODE_CHANNEL]))
     {
@@ -527,6 +544,10 @@ static void gimbal_behavour_set(gimbal_control_t *gimbal_mode_set)
         if (last_gimbal_behaviour == GIMBAL_ZERO_FORCE && gimbal_behaviour != GIMBAL_ZERO_FORCE)
         {
             gimbal_behaviour = GIMBAL_INIT;
+        }
+        else if (last_gimbal_behaviour != GIMBAL_AUTOAIM && gimbal_behaviour == GIMBAL_AUTOAIM)
+        {
+            autoaim_target_reset();
         }
         last_gimbal_behaviour = gimbal_behaviour;
     }
@@ -690,29 +711,36 @@ static void gimbal_absolute_angle_control(fp32 *yaw, fp32 *pitch, gimbal_control
         return;
     }
 
-    static fp32 yaw_channel = 0, pitch_channel = 0;
+    static int16_t yaw_channel = 0, pitch_channel = 0;
 
 #if USE_RMSTATE
 		if(switch_is_mid(gimbal_control_set->gimbal_rc_ctrl->rc.s[0])){	//keyboard control ¼üÊóµµ
 			//keyboard set speed set-point
 			//¼üÅÌ¿ØÖÆ
-			*yaw = -gimbal_control_set->gimbal_rc_ctrl->mouse.x * YAW_MOUSE_SEN;
-			*pitch = -gimbal_control_set->gimbal_rc_ctrl->mouse.y * PITCH_MOUSE_SEN;
+			if((gimbal_control_set->gimbal_rc_ctrl->key.v & SWING_LEFT_KEY)== SWING_LEFT_KEY)
+			{
+				*yaw= 0.005f;
+			}
+			else if((gimbal_control_set->gimbal_rc_ctrl->key.v & SWING_RIGHT_KEY)== SWING_RIGHT_KEY)
+			{
+				*yaw= -0.005f;
+			}
+			else
+			{
+				*yaw = -gimbal_control_set->gimbal_rc_ctrl->mouse.x * YAW_MOUSE_SEN;
+			    *pitch = -gimbal_control_set->gimbal_rc_ctrl->mouse.y * PITCH_MOUSE_SEN;
+			}
+//			*yaw = -gimbal_control_set->gimbal_rc_ctrl->mouse.x * YAW_MOUSE_SEN;
+//			*pitch = -gimbal_control_set->gimbal_rc_ctrl->mouse.y * PITCH_MOUSE_SEN;
 		}
 		else if(switch_is_up(gimbal_control_set->gimbal_rc_ctrl->rc.s[0])){	//remote control Ò£¿ØÆ÷µµ
 			//remote set speed set-point
 			//Ò£¿ØÆ÷¿ØÖÆ
 			rc_deadband_limit(gimbal_control_set->gimbal_rc_ctrl->rc.ch[YAW_CHANNEL], yaw_channel, RC_DEADBAND);
 			rc_deadband_limit(gimbal_control_set->gimbal_rc_ctrl->rc.ch[PITCH_CHANNEL], pitch_channel, RC_DEADBAND);
-			
-			*yaw = yaw_channel * YAW_RC_SEN;
-	#if PITCH_TURN
-			*pitch = -pitch_channel * PITCH_RC_SEN;
-	#else 
-			*pitch = pitch_channel * PITCH_RC_SEN;
-	#endif			
-			//*pitch =  - pitch_channel * PITCH_RC_SEN;
 
+			        *yaw = yaw_channel * YAW_RC_SEN;
+        *pitch = -pitch_channel * PITCH_RC_SEN;
 		}
 		else{
 			//²»¿ØÖÆ»úÆ÷ÈË
@@ -723,8 +751,8 @@ static void gimbal_absolute_angle_control(fp32 *yaw, fp32 *pitch, gimbal_control
 		rc_deadband_limit(gimbal_control_set->gimbal_rc_ctrl->rc.ch[YAW_CHANNEL], yaw_channel, RC_DEADBAND);
     rc_deadband_limit(gimbal_control_set->gimbal_rc_ctrl->rc.ch[PITCH_CHANNEL], pitch_channel, RC_DEADBAND);
 
-    *yaw = yaw_channel * YAW_RC_SEN - gimbal_control_set->gimbal_rc_ctrl->mouse.x * YAW_MOUSE_SEN;
-    *pitch = pitch_channel * PITCH_RC_SEN + gimbal_control_set->gimbal_rc_ctrl->mouse.y * PITCH_MOUSE_SEN;
+//    *yaw = yaw_channel * YAW_RC_SEN - gimbal_control_set->gimbal_rc_ctrl->mouse.x * YAW_MOUSE_SEN;
+//    *pitch = pitch_channel * PITCH_RC_SEN + gimbal_control_set->gimbal_rc_ctrl->mouse.y * PITCH_MOUSE_SEN;
 #endif
 
 }
@@ -757,8 +785,20 @@ static void gimbal_relative_angle_control(fp32 *yaw, fp32 *pitch, gimbal_control
 		if(switch_is_mid(gimbal_control_set->gimbal_rc_ctrl->rc.s[0])){	//keyboard control ¼üÊóµµ
 			//keyboard set speed set-point
 			//¼üÅÌ¿ØÖÆ
-			*yaw = -gimbal_control_set->gimbal_rc_ctrl->mouse.x * YAW_MOUSE_SEN;
-			*pitch = gimbal_control_set->gimbal_rc_ctrl->mouse.y * PITCH_MOUSE_SEN;
+			if((gimbal_control_set->gimbal_rc_ctrl->key.v & SWING_LEFT_KEY)== SWING_LEFT_KEY)
+			{
+				*yaw= 0.005f;
+			}
+			else if((gimbal_control_set->gimbal_rc_ctrl->key.v & SWING_RIGHT_KEY)== SWING_RIGHT_KEY)
+			{
+				*yaw= -0.005f;
+			}
+			else{
+				*yaw = -gimbal_control_set->gimbal_rc_ctrl->mouse.x * YAW_MOUSE_SEN;
+			    *pitch = -gimbal_control_set->gimbal_rc_ctrl->mouse.y * PITCH_MOUSE_SEN;
+			}
+//			*yaw = -gimbal_control_set->gimbal_rc_ctrl->mouse.x * YAW_MOUSE_SEN;
+//			*pitch = gimbal_control_set->gimbal_rc_ctrl->mouse.y * PITCH_MOUSE_SEN;
 		}
 		else if(switch_is_up(gimbal_control_set->gimbal_rc_ctrl->rc.s[0])){	//remote control Ò£¿ØÆ÷µµ
 			//remote set speed set-point
@@ -809,4 +849,15 @@ static void gimbal_motionless_control(fp32 *yaw, fp32 *pitch, gimbal_control_t *
     }
     *yaw = 0.0f;
     *pitch = 0.0f;
+}
+
+static void gimbal_autoaim_control(fp32 *yaw, fp32 *pitch, gimbal_control_t *gimbal_control_set)
+{
+    if (yaw == NULL || pitch == NULL || gimbal_control_set == NULL)
+    {
+        return;
+    }
+    fp32 absolute_yaw_set = gimbal_control_set->gimbal_yaw_motor.absolute_angle_set;
+    fp32 absolute_pitch_set = gimbal_control_set->gimbal_pitch_motor.absolute_angle_set;
+    set_autoaim_angle(yaw, pitch, absolute_yaw_set, absolute_pitch_set);
 }

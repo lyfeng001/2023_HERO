@@ -83,6 +83,7 @@
 #include "struct_typedef.h"
 
 #include "gimbal_task.h"
+#include "autoaim.h"
 typedef enum
 {
   GIMBAL_ZERO_FORCE = 0, 
@@ -90,7 +91,8 @@ typedef enum
   GIMBAL_CALI,           
   GIMBAL_ABSOLUTE_ANGLE, 
   GIMBAL_RELATIVE_ANGLE, 
-  GIMBAL_MOTIONLESS,     
+  GIMBAL_MOTIONLESS, 
+  GIMBAL_AUTOAIM,    
 } gimbal_behaviour_e;
 
 /**

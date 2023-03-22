@@ -304,6 +304,8 @@ gimbal_control_t gimbal_control;
 //发送的电机电流
 static int16_t yaw_can_set_current = 0, pitch_can_set_current = 0, shoot_can_set_current = 0;
 
+static uint8_t send_count = 0;
+
 /**
   * @brief          gimbal task, osDelay GIMBAL_CONTROL_TIME (1ms) 
   * @param[in]      pvParameters: null
@@ -327,6 +329,8 @@ void gimbal_task(void const *pvParameters)
     //shoot init
     //射击初始化
     shoot_init();
+    // 自瞄初始化
+	  autoaim_init();
     //wait for all motor online
     //判断电机是否都上线
     while (toe_is_error(YAW_GIMBAL_MOTOR_TOE) || toe_is_error(PITCH_GIMBAL_MOTOR_TOE))
@@ -378,6 +382,13 @@ void gimbal_task(void const *pvParameters)
 #if GIMBAL_TEST_MODE
         J_scope_gimbal_test();
 #endif
+
+        send_count++;
+        if (send_count == 5) // 5ms向上位机发一次数据
+        {
+          send_to_computer(-gimbal_control.gimbal_yaw_motor.absolute_angle, gimbal_control.gimbal_pitch_motor.absolute_angle);
+          send_count = 0;
+        }
 
         vTaskDelay(GIMBAL_CONTROL_TIME);
 //		heat_now = ext_shoot_data.bullet_speed;

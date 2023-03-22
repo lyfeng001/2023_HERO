@@ -599,7 +599,7 @@ static void spinning_move (chassis_move_t *chassis_move_spinnig,fp32 angle_tran)
 	chassis_move_spinnig->chassis_relative_angle_set = rad_format(angle_tran)
 				   + chassis_move_spinnig->chassis_yaw_motor->relative_angle;
 
-    chassis_move_spinnig->wz_set = (-1.5f*PID_calc(&chassis_move_spinnig->chassis_angle_pid,
+    chassis_move_spinnig->wz_set = (-5.0f*PID_calc(&chassis_move_spinnig->chassis_angle_pid,
 								    chassis_move_spinnig->chassis_yaw_motor->relative_angle,
 										   chassis_move_spinnig->chassis_relative_angle_set));
 }
