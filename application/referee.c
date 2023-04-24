@@ -825,6 +825,8 @@ void ext_robot_command_interpret03(uint8_t * ext_robot_command_Message)
 	memcpy((uint8_t*)&ext_robot_command.target_robot_ID, ext_robot_command_Message + 13, 2);
 }
 
+
+
 ////图传遥控信息标识（0x0304）
 void ext_robot_command_interpret04(uint8_t * ext_robot_command_Message)
 {
