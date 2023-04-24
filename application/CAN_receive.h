@@ -54,11 +54,15 @@ typedef enum
 //rm motor data
 typedef struct
 {
+	uint16_t last_last_last_ecd;
+	uint16_t last_last_ecd;
     uint16_t ecd;
     int16_t speed_rpm;
     int16_t given_current;
     uint8_t temperate;
     int16_t last_ecd;
+	fp32 relative_angle_2laps;
+	int16_t ecd_count;
 } motor_measure_t;
 
 //supercap data

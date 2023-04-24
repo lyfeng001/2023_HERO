@@ -21,8 +21,8 @@
 typedef struct
 {
     uint8_t head;       // 1 byte
-    fp32 x_in_world;    // 4 byte mm ·¢ËÍÊ±¸´ÓÃÎªyaw degree
-    fp32 y_in_world;    // 4 byte mm ·¢ËÍÊ±¸´ÓÃÎªpitch degree
+    fp32 x_in_world;    // 4 byte mm å‘é€æ—¶å¤ç”¨ä¸ºyaw degree
+    fp32 y_in_world;    // 4 byte mm å‘é€æ—¶å¤ç”¨ä¸ºpitch degree
     fp32 z_in_world;    // 4 byte mm
     fp32 vx_in_world;   // 4 byte mm/ms
     fp32 vy_in_world;   // 4 byte mm/ms
@@ -88,9 +88,9 @@ void set_autoaim_angle(fp32 *add_yaw_set, fp32 *add_pitch_set, fp32 absolute_yaw
         //     autoaim_target.outdated_count++;
         // }
 
-        // µç¿Ø½Ç¶ÈÕı·½Ïò£º
-        // yaw£º²Ù×÷ÊÖÊÓ½ÇÏÂ£¬Ç¹¹ÜÏò×óÎªÕı·½Ïò
-        // pitch: Ì§Ç¹ÎªÕı·½Ïò
+        // ç”µæ§è§’åº¦æ­£æ–¹å‘ï¼š
+        // yawï¼šæ“ä½œæ‰‹è§†è§’ä¸‹ï¼Œæªç®¡å‘å·¦ä¸ºæ­£æ–¹å‘
+        // pitch: æŠ¬æªä¸ºæ­£æ–¹å‘
         fp32 xz_length;
         arm_sqrt_f32(autoaim_target.x_in_world * autoaim_target.x_in_world + autoaim_target.z_in_world * autoaim_target.z_in_world, &xz_length);
         target_yaw_in_world = -atan2(autoaim_target.x_in_world, autoaim_target.z_in_world);
@@ -98,7 +98,7 @@ void set_autoaim_angle(fp32 *add_yaw_set, fp32 *add_pitch_set, fp32 absolute_yaw
 
         *add_yaw_set = target_yaw_in_world - absolute_yaw_set;
         *add_pitch_set = target_pitch_in_world - absolute_pitch_set;
-        // *add_pitch_set = 0.0f; // »úĞµÃ»×°Æ½ºâ²¹³¥£¬ÏÈ½ûµô
+        // *add_pitch_set = 0.0f; // æœºæ¢°æ²¡è£…å¹³è¡¡è¡¥å¿ï¼Œå…ˆç¦æ‰
     }
     else
     {
@@ -109,13 +109,13 @@ void set_autoaim_angle(fp32 *add_yaw_set, fp32 *add_pitch_set, fp32 absolute_yaw
 
 void usart1_rx_dma_init(uint8_t *rx1_buf, uint8_t *rx2_buf, uint16_t dma_buf_num)
 {
-    // Ê¹ÄÜDMA´®¿Ú½ÓÊÕ
+    // ä½¿èƒ½DMAä¸²å£æ¥æ”¶
     SET_BIT(huart1.Instance->CR3, USART_CR3_DMAR);
 
-    // Ê¹ÄÜ¿ÕÏĞÖĞ¶Ï
+    // ä½¿èƒ½ç©ºé—²ä¸­æ–­
     __HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
 
-    // Ê§Ğ§DMA
+    // å¤±æ•ˆDMA
     __HAL_DMA_DISABLE(&hdma_usart1_rx);
     while (hdma_usart1_rx.Instance->CR & DMA_SxCR_EN)
     {
@@ -124,30 +124,30 @@ void usart1_rx_dma_init(uint8_t *rx1_buf, uint8_t *rx2_buf, uint16_t dma_buf_num
 
     hdma_usart1_rx.Instance->PAR = (uint32_t) & (USART1->DR);
 
-    // »º³åÇø1
+    // ç¼“å†²åŒº1
     hdma_usart1_rx.Instance->M0AR = (uint32_t)(rx1_buf);
 
-    // »º³åÇø2
+    // ç¼“å†²åŒº2
     hdma_usart1_rx.Instance->M1AR = (uint32_t)(rx2_buf);
 
-    // Êı¾İ³¤¶È
+    // æ•°æ®é•¿åº¦
     hdma_usart1_rx.Instance->NDTR = dma_buf_num;
 
-    // Ê¹ÄÜË«»º³åÇø
+    // ä½¿èƒ½åŒç¼“å†²åŒº
     SET_BIT(hdma_usart1_rx.Instance->CR, DMA_SxCR_DBM);
 
-    // Ê¹ÄÜDMA
+    // ä½¿èƒ½DMA
     __HAL_DMA_ENABLE(&hdma_usart1_rx);
 }
 
-// ÖĞ¶Ï·şÎñº¯Êı
+// ä¸­æ–­æœåŠ¡å‡½æ•°
 void USART1_IRQHandler(void)
 {
-    if (huart1.Instance->SR & UART_FLAG_RXNE) // ½ÓÊÕÊı¾İÖĞ
+    if (huart1.Instance->SR & UART_FLAG_RXNE) // æ¥æ”¶æ•°æ®ä¸­
     {
         __HAL_UART_CLEAR_PEFLAG(&huart1);
     }
-    else if (USART1->SR & UART_FLAG_IDLE) // Êı¾İ½ÓÊÕÍê±Ï
+    else if (USART1->SR & UART_FLAG_IDLE) // æ•°æ®æ¥æ”¶å®Œæ¯•
     {
         static uint16_t this_time_fram_len = 0;
 
@@ -155,20 +155,20 @@ void USART1_IRQHandler(void)
 
         if ((hdma_usart1_rx.Instance->CR & DMA_SxCR_CT) == RESET)
         {
-            // »º³åÇø1
-            // Ê§Ğ§DMA
+            // ç¼“å†²åŒº1
+            // å¤±æ•ˆDMA
             __HAL_DMA_DISABLE(&hdma_usart1_rx);
 
-            // »ñÈ¡½ÓÊÕÊı¾İ³¤¶È£¬³¤¶È = Éè¶¨³¤¶È - Ê£Óà³¤¶È
+            // è·å–æ¥æ”¶æ•°æ®é•¿åº¦ï¼Œé•¿åº¦ = è®¾å®šé•¿åº¦ - å‰©ä½™é•¿åº¦
             this_time_fram_len = AUTOAIM_FRAME_BUF - hdma_usart1_rx.Instance->NDTR;
 
-            // ÖØĞÂÉè¶¨Êı¾İ³¤¶È
+            // é‡æ–°è®¾å®šæ•°æ®é•¿åº¦
             hdma_usart1_rx.Instance->NDTR = AUTOAIM_FRAME_BUF;
 
-            // Éè¶¨»º³åÇø2
+            // è®¾å®šç¼“å†²åŒº2
             hdma_usart1_rx.Instance->CR |= DMA_SxCR_CT;
 
-            // Ê¹ÄÜDMA
+            // ä½¿èƒ½DMA
             __HAL_DMA_ENABLE(&hdma_usart1_rx);
 
             if (this_time_fram_len == AUTOAIM_FRAME_LEN)
@@ -178,20 +178,20 @@ void USART1_IRQHandler(void)
         }
         else
         {
-            // »º³åÇø2
-            // Ê§Ğ§DMA
+            // ç¼“å†²åŒº2
+            // å¤±æ•ˆDMA
             __HAL_DMA_DISABLE(&hdma_usart1_rx);
 
-            // »ñÈ¡½ÓÊÕÊı¾İ³¤¶È£¬³¤¶È = Éè¶¨³¤¶È - Ê£Óà³¤¶È
+            // è·å–æ¥æ”¶æ•°æ®é•¿åº¦ï¼Œé•¿åº¦ = è®¾å®šé•¿åº¦ - å‰©ä½™é•¿åº¦
             this_time_fram_len = AUTOAIM_FRAME_BUF - hdma_usart1_rx.Instance->NDTR;
 
-            // ÖØĞÂÉè¶¨Êı¾İ³¤¶È
+            // é‡æ–°è®¾å®šæ•°æ®é•¿åº¦
             hdma_usart1_rx.Instance->NDTR = AUTOAIM_FRAME_BUF;
 
-            // Éè¶¨»º³åÇø1
+            // è®¾å®šç¼“å†²åŒº1
             hdma_usart1_rx.Instance->CR &= ~(DMA_SxCR_CT);
 
-            // Ê¹ÄÜDMA
+            // ä½¿èƒ½DMA
             __HAL_DMA_ENABLE(&hdma_usart1_rx);
 
             if (this_time_fram_len == AUTOAIM_FRAME_LEN)
@@ -218,7 +218,7 @@ uint8_t unpack_frame(uint8_t *autoaim_buf)
     autoaim_target.vy_in_world = frame_rx.vy_in_world;
     autoaim_target.vz_in_world = frame_rx.vz_in_world;
     autoaim_target.flag = frame_rx.flag;
-    autoaim_target.outdated_count = 0; // ĞÂÏÊ³öÂ¯µÄÊı¾İ
+    autoaim_target.outdated_count = 0; // æ–°é²œå‡ºç‚‰çš„æ•°æ®
     return 1;
 }
 

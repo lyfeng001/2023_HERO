@@ -740,7 +740,7 @@ static void gimbal_absolute_angle_control(fp32 *yaw, fp32 *pitch, gimbal_control
 			rc_deadband_limit(gimbal_control_set->gimbal_rc_ctrl->rc.ch[PITCH_CHANNEL], pitch_channel, RC_DEADBAND);
 
 			        *yaw = yaw_channel * YAW_RC_SEN;
-        *pitch = -pitch_channel * PITCH_RC_SEN;
+        *pitch = pitch_channel * PITCH_RC_SEN;
 		}
 		else{
 			//不控制机器人

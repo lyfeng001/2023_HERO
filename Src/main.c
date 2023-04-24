@@ -52,6 +52,9 @@
 #include "referee_usart_task.h"
 #include "usb_task.h"
 #include "voltage_task.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -105,6 +108,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */  
+
 	HAL_Init();
 
   /* USER CODE BEGIN Init */

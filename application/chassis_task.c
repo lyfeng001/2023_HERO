@@ -31,6 +31,9 @@
 #include "detect_task.h"
 #include "INS_task.h"
 #include "chassis_power_control.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 
 #define USE_RMSTATE 1
 #define rc_deadband_limit(input, output, dealine)        \
@@ -46,7 +49,14 @@
     }
 
 
-/**
+
+int REVERSE_FLAG=1;
+int	last_r_key=0;
+double time_a;
+int time_i = 0;
+int start_count = 0;
+bool spinning_state = 0;
+	/**
   * @brief          "chassis_move" valiable initialization, include pid initialization, remote control data point initialization, 3508 chassis motors
   *                 data point initialization, gimbal motor data point initialization, and gyro sensor angle point initialization.
   * @param[out]     chassis_move_init: "chassis_move" valiable point
@@ -120,6 +130,21 @@ static void chassis_control_loop(chassis_move_t *chassis_move_control_loop);
 
 static void spinning_move (chassis_move_t *chassis_move_spinnig,fp32 angle_tran);
 
+static fp32 motor_ecd_to_angle_change(uint16_t ecd, uint16_t offset_ecd)
+{
+    int32_t relative_ecd = ecd - offset_ecd;
+    if (relative_ecd >= 0 && relative_ecd <=8191)
+    {
+        
+    }
+    else
+    {
+        relative_ecd += 8192;
+    }
+
+    return relative_ecd;
+}
+
 #if INCLUDE_uxTaskGetStackHighWaterMark
 uint32_t chassis_high_water;
 #endif
@@ -164,13 +189,17 @@ void chassis_task(void const *pvParameters)
         chassis_mode_change_control_transit(&chassis_move);
         //chassis data update
         //底盘数据更新
+			taskENTER_CRITICAL();
         chassis_feedback_update(&chassis_move);
         //set chassis control set-point 
         //底盘控制量设置
+
         chassis_set_contorl(&chassis_move);
         //chassis control pid calculate
         //底盘控制PID计算
         chassis_control_loop(&chassis_move);
+			taskEXIT_CRITICAL();
+
 
         //make sure  one motor is online at least, so that the control CAN message can be received
         //确保至少一个电机在线， 这样CAN控制包可以被接收到
@@ -191,7 +220,8 @@ void chassis_task(void const *pvParameters)
             }
         }
 		
-		UART_DMA_SEND(ext_power_heat_data.chassis_power);
+//		UART_DMA_SEND(ext_power_heat_data.chassis_power);
+		UART_DMA_SEND(chassis_move.chassis_yaw_motor->gimbal_motor_measure->ecd - chassis_move.chassis_yaw_motor->gimbal_motor_measure->last_last_ecd);
         //os delay
         //系统延时
         vTaskDelay(CHASSIS_CONTROL_TIME_MS);
@@ -269,7 +299,10 @@ static void chassis_init(chassis_move_t *chassis_move_init)
 
     chassis_move_init->vy_max_speed = NORMAL_MAX_CHASSIS_SPEED_Y;
     chassis_move_init->vy_min_speed = -NORMAL_MAX_CHASSIS_SPEED_Y;
-
+	
+	chassis_move_init->ecd_count = 0;
+	chassis_move_init->relative_angle_2laps = 0;
+	start_count = 0;
     //update data
     //更新一下数据
     chassis_feedback_update(chassis_move_init);
@@ -404,7 +437,12 @@ void chassis_rc_to_control_vector(fp32 *vx_set, fp32 *vy_set, chassis_move_t *ch
     fp32 vx_set_channel, vy_set_channel;
 
 #if USE_RMSTATE
-
+		
+		if((chassis_move_rc_to_vector->chassis_RC->key.v & KEY_PRESSED_OFFSET_R)&&last_r_key==0)
+		{
+			REVERSE_FLAG *= -1;			
+		}
+		last_r_key = chassis_move_rc_to_vector->chassis_RC->key.v & KEY_PRESSED_OFFSET_R;
 		if(switch_is_mid(chassis_move_rc_to_vector->chassis_RC->rc.s[0]))        //keyboard control 键鼠档
 		{	
 			if(chassis_move_rc_to_vector->chassis_RC->key.v & CHASSIS_FRONT_KEY||
@@ -414,20 +452,20 @@ void chassis_rc_to_control_vector(fp32 *vx_set, fp32 *vy_set, chassis_move_t *ch
 			{
 					 if (chassis_move_rc_to_vector->chassis_RC->key.v & CHASSIS_FRONT_KEY)
 					{
-						vx_set_channel = -chassis_move_rc_to_vector->vx_max_speed;
+						vx_set_channel = -(chassis_move_rc_to_vector->vx_max_speed) * REVERSE_FLAG;
 					}
 					else if (chassis_move_rc_to_vector->chassis_RC->key.v & CHASSIS_BACK_KEY)
 					{
-						vx_set_channel = -chassis_move_rc_to_vector->vx_min_speed;
+						vx_set_channel = -(chassis_move_rc_to_vector->vx_min_speed) * REVERSE_FLAG;
 					}
 
 					if (chassis_move_rc_to_vector->chassis_RC->key.v & CHASSIS_LEFT_KEY)
 					{
-						vy_set_channel = chassis_move_rc_to_vector->vy_max_speed;
+						vy_set_channel = (chassis_move_rc_to_vector->vy_max_speed) * REVERSE_FLAG;
 					}
 					else if (chassis_move_rc_to_vector->chassis_RC->key.v & CHASSIS_RIGHT_KEY)
 					{
-						vy_set_channel = chassis_move_rc_to_vector->vy_min_speed;
+						vy_set_channel = (chassis_move_rc_to_vector->vy_min_speed) * REVERSE_FLAG;
 					}
 			}
 			else
@@ -443,8 +481,8 @@ void chassis_rc_to_control_vector(fp32 *vx_set, fp32 *vy_set, chassis_move_t *ch
 			rc_deadband_limit(chassis_move_rc_to_vector->chassis_RC->rc.ch[CHASSIS_Y_CHANNEL], vy_channel, CHASSIS_RC_DEADLINE);
 			//remote set speed set-point
 			//遥控器控制
-			vx_set_channel = vx_channel * -CHASSIS_VX_RC_SEN;
-			vy_set_channel = vy_channel * -CHASSIS_VY_RC_SEN;
+			vx_set_channel = vx_channel * -CHASSIS_VX_RC_SEN * REVERSE_FLAG;
+			vy_set_channel = vy_channel * -CHASSIS_VY_RC_SEN * REVERSE_FLAG;
 		}
 		else{	//不控制机器人
 			vx_set_channel = 0;
@@ -517,11 +555,36 @@ static void chassis_set_contorl(chassis_move_t *chassis_move_control)
     {
         return;
     }
-
+//	if(start_count == 2000)
+//	{
+//		chassis_move_control->relative_angle_2laps = 0;
+//	}
+//	start_count++;
     fp32 vx_set = 0.0f, vy_set = 0.0f, angle_set = 0.0f;
     //get three control set-point, 获取三个控制设置值
     chassis_behaviour_control_set(&vx_set, &vy_set, &angle_set, chassis_move_control);
-
+	
+	
+	
+//	if(motor_ecd_to_angle_change(chassis_move_control->chassis_yaw_motor->gimbal_motor_measure->ecd,MIDDLE_YAW) - motor_ecd_to_angle_change(chassis_move_control->chassis_yaw_motor->gimbal_motor_measure->last_ecd,MIDDLE_YAW) > HALF_ECD_RANGE)
+//	{
+//		chassis_move_control->ecd_count--;
+//	}
+//	else if(motor_ecd_to_angle_change(chassis_move_control->chassis_yaw_motor->gimbal_motor_measure->ecd,MIDDLE_YAW) - motor_ecd_to_angle_change(chassis_move_control->chassis_yaw_motor->gimbal_motor_measure->last_ecd,MIDDLE_YAW) < -HALF_ECD_RANGE)
+//	{
+//		chassis_move_control->ecd_count++;
+//	}
+//	
+//	chassis_move_control->relative_angle_2laps = chassis_move_control->ecd_count * ECD_RANGE + motor_ecd_to_angle_change(chassis_move_control->chassis_yaw_motor->gimbal_motor_measure->ecd , MIDDLE_YAW);
+//	while(chassis_move_control->relative_angle_2laps>=(8192.0f*2.0f))
+//	{
+//		chassis_move_control->relative_angle_2laps -= 8192.0f*2.0f;
+//	}
+//	chassis_move_control->relative_angle_2laps = rad_format_4PI(chassis_move_control->relative_angle_2laps*MOTOR_ECD_TO_ANGLE);
+//	chassis_move_control->relative_angle_2laps = chassis_move_control->relative_angle_2laps/2.0f;
+	
+	
+	
     //follow gimbal mode
     //跟随云台模式
     if (chassis_move_control->chassis_mode == CHASSIS_VECTOR_FOLLOW_GIMBAL_YAW)
@@ -531,20 +594,44 @@ static void chassis_set_contorl(chassis_move_t *chassis_move_control)
         //旋转控制底盘速度方向，保证前进方向是云台方向，有利于运动平稳
         sin_yaw = arm_sin_f32(-chassis_move_control->chassis_yaw_motor->relative_angle);
         cos_yaw = arm_cos_f32(-chassis_move_control->chassis_yaw_motor->relative_angle);
-        chassis_move_control->vx_set = cos_yaw * vx_set + sin_yaw * vy_set;
-        chassis_move_control->vy_set = -sin_yaw * vx_set + cos_yaw * vy_set;
+        chassis_move_control->vx_set = (cos_yaw * vx_set + sin_yaw * vy_set) * REVERSE_FLAG;
+        chassis_move_control->vy_set = (-sin_yaw * vx_set + cos_yaw * vy_set) * REVERSE_FLAG;
 		
 		//set control relative angle  set-point / calculate ratation speed
         //设置控制相对云台角度(chassis_relative_angle_set),计算旋转PID角速度(wz_set) —— 
 			  //小陀螺模式控制与否
 		if ((chassis_move_control->chassis_RC->key.v & KEY_PRESSED_OFFSET_SHIFT ) == KEY_PRESSED_OFFSET_SHIFT)
 		{
+			spinning_state=1;
+//			if(chassis_move_control->chassis_yaw_motor->gimbal_motor_measure->ecd - chassis_move_control->chassis_yaw_motor->gimbal_motor_measure->last_ecd > HALF_ECD_RANGE)
+//			{
+//				chassis_move_control->ecd_count--;
+//			}
+//			else if(chassis_move_control->chassis_yaw_motor->gimbal_motor_measure->ecd - chassis_move_control->chassis_yaw_motor->gimbal_motor_measure->last_ecd < -HALF_ECD_RANGE)
+//			{
+//				chassis_move_control->ecd_count++;
+//			}
+//			
+//			chassis_move_control->relative_angle_2laps = chassis_move_control->ecd_count * ECD_RANGE + chassis_move_control->chassis_yaw_motor->gimbal_motor_measure->ecd;
+//			while(chassis_move_control->relative_angle_2laps>=(8192.0f*2.0f))
+//			{
+//				chassis_move_control->relative_angle_2laps -= 8192.0f*2.0f;
+//			}
+//			chassis_move_control->relative_angle_2laps = rad_format_4PI(chassis_move_control->relative_angle_2laps*MOTOR_ECD_TO_ANGLE);
+//			chassis_move_control->relative_angle_2laps = chassis_move_control->relative_angle_2laps/2.0f;
+			
 			spinning_move(chassis_move_control,angle_set);
+			
+			sin_yaw = arm_sin_f32(-chassis_move_control->chassis_yaw_motor->gimbal_motor_measure->relative_angle_2laps);
+			cos_yaw = arm_cos_f32(-chassis_move_control->chassis_yaw_motor->gimbal_motor_measure->relative_angle_2laps);
+			chassis_move_control->vx_set = (cos_yaw * vx_set - sin_yaw * vy_set) * REVERSE_FLAG;
+			chassis_move_control->vy_set = (sin_yaw * vx_set + cos_yaw * vy_set) * REVERSE_FLAG;
 		}
 		else
 		{
+			spinning_state=0;
 			chassis_move_control->chassis_relative_angle_set = rad_format(angle_set);
-			chassis_move_control->wz_set = (-PID_calc(&chassis_move_control->chassis_angle_pid, chassis_move_control->chassis_yaw_motor->relative_angle, chassis_move_control->chassis_relative_angle_set));
+			chassis_move_control->wz_set = (-PID_calc(&chassis_move_control->chassis_angle_pid, chassis_move_control->chassis_yaw_motor->gimbal_motor_measure->relative_angle_2laps, chassis_move_control->chassis_relative_angle_set));
 		}
         //calculate ratation speed
         //计算旋转PID角速度
@@ -596,11 +683,22 @@ static void chassis_set_contorl(chassis_move_t *chassis_move_control)
   */
 static void spinning_move (chassis_move_t *chassis_move_spinnig,fp32 angle_tran)
 {
-	chassis_move_spinnig->chassis_relative_angle_set = rad_format(angle_tran)
-				   + chassis_move_spinnig->chassis_yaw_motor->relative_angle;
 
-    chassis_move_spinnig->wz_set = (-5.0f*PID_calc(&chassis_move_spinnig->chassis_angle_pid,
-								    chassis_move_spinnig->chassis_yaw_motor->relative_angle,
+
+	chassis_move_spinnig->chassis_relative_angle_set = rad_format(angle_tran)
+				   + chassis_move_spinnig->chassis_yaw_motor->gimbal_motor_measure->relative_angle_2laps;
+	
+
+	if(time_i>=200)
+	{
+	    time_a = (rand()%50+20)/10.0f;
+		time_i = 0;
+	}
+	time_i++;
+//	
+
+    chassis_move_spinnig->wz_set = (-time_a*PID_calc(&chassis_move_spinnig->chassis_angle_pid,
+								    chassis_move_spinnig->chassis_yaw_motor->gimbal_motor_measure->relative_angle_2laps,
 										   chassis_move_spinnig->chassis_relative_angle_set));
 }
 
@@ -617,6 +715,7 @@ static void spinning_move (chassis_move_t *chassis_move_spinnig,fp32 angle_tran)
   * @param[in]      vx_set: 纵向速度
   * @param[in]      vy_set: 横向速度
   * @param[in]      wz_set: 旋转速度
+
   * @param[out]     wheel_speed: 四个麦轮速度
   * @retval         none
   */

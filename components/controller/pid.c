@@ -17,6 +17,8 @@
 
 #include "pid.h"
 #include "main.h"
+#include "user_lib.h"
+#include "arm_math.h"
 
 #define LimitMax(input, max)   \
     {                          \
@@ -187,4 +189,32 @@ void PID_clear(pid_type_def *pid)
     pid->Dbuf[0] = pid->Dbuf[1] = pid->Dbuf[2] = 0.0f;
     pid->out = pid->Pout = pid->Iout = pid->Dout = 0.0f;
     pid->fdb = pid->set = 0.0f;
+}
+
+
+fp32 shoot_PID_calc(pid_type_def *pid, fp32 ref, fp32 set, fp32 error_delta)
+{
+
+	if (pid == NULL)
+    {
+        return 0.0f;
+    }
+    pid->error[2] = pid->error[1];
+    pid->error[1] = pid->error[0];
+    pid->set = set;
+    pid->fdb = ref;
+    pid->error[0] = rad_format(set - ref);
+    if (pid->mode == PID_POSITION)
+    {
+        pid->Pout = pid->Kp * pid->error[0];
+        pid->Iout += pid->Ki * pid->error[0];
+//        pid->Dbuf[2] = pid->Dbuf[1];
+//        pid->Dbuf[1] = pid->Dbuf[0];
+//        pid->Dbuf[0] = (pid->error[0] - pid->error[1]);
+        pid->Dout = pid->Kd * error_delta;
+        LimitMax(pid->Iout, pid->max_iout);
+        pid->out = pid->Pout + pid->Iout + pid->Dout;
+        LimitMax(pid->out, pid->max_out);
+    }
+    return pid->out;
 }

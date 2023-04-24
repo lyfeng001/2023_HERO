@@ -71,10 +71,12 @@ static void fric_control_loop(void);
 
 void hero_shoot_bullet_control(void);
 
+
+
 int shoot_derta=0;
-pid_type_def trigger_angle_motor_pid;
-
-
+//pid_type_def trigger_angle_motor_pid;
+int shoot_i = 0;
+int shoot_flag = 0;
 shoot_control_t shoot_control;          //射击数据
 fric_motor_t fric_left_motor;			//摩擦轮数据
 fric_motor_t fric_right_motor;
@@ -106,7 +108,7 @@ void shoot_init(void)
 		PID_init(&fric_left_motor.fric_motor_pid, PID_POSITION, fric_left_speed_pid, FRIC_LEFT_PID_MAX_OUT, FRIC_LEFT_PID_MAX_OUT);
 		PID_init(&fric_right_motor.fric_motor_pid, PID_POSITION, fric_right_speed_pid, FRIC_RIGHT_PID_MAX_OUT, FRIC_RIGHT_PID_MAX_OUT);		
 		
-		PID_init(&trigger_angle_motor_pid, PID_POSITION, Trigger_angle_pid, TRIGGER_READY_PID_MAX_OUT, TRIGGER_READY_PID_MAX_IOUT);
+		PID_init(&shoot_control.trigger_angle_motor_pid, PID_POSITION, Trigger_angle_pid, TRIGGER_READY_PID_MAX_OUT, TRIGGER_READY_PID_MAX_IOUT);
 		
     //更新数据
     shoot_feedback_update();
@@ -115,10 +117,13 @@ void shoot_init(void)
     shoot_control.angle = shoot_control.shoot_motor_measure->ecd * MOTOR_ECD_TO_ANGLE;
     shoot_control.given_current = 0;
     shoot_control.move_flag = 0;
+	shoot_control.move_flag2 = 0;
     shoot_control.set_angle = shoot_control.angle;
+	shoot_control.angle_begin = shoot_control.angle;
     shoot_control.speed = 0.0f;
     shoot_control.speed_set = 0.0f;
     shoot_control.key_time = 0;
+	shoot_control.move_time = 0;
 }
 
 void fric_control_loop(void)
@@ -128,8 +133,8 @@ void fric_control_loop(void)
 	/**速度反馈值滤波待补全**/
 	if (shoot_control.fric_state == FRIC_ON)
 	{
-		fric_left_motor.speed_set = -7000;
-		fric_right_motor.speed_set = 7000;
+		fric_left_motor.speed_set = -5000;
+		fric_right_motor.speed_set = 5000;
 	}
 	else
 	{
@@ -159,34 +164,33 @@ int16_t shoot_control_loop(void)
     if (shoot_control.shoot_mode == SHOOT_STOP)
     {
         //设置拨弹轮的速度
-        shoot_control.speed_set = 0.0f;
+//        shoot_control.speed_set = 0.0f;
 		shoot_control.debug_flag = 1;
     }
     else if (shoot_control.shoot_mode == SHOOT_READY_FRIC)
     {
         //设置拨弹轮的速度
-        shoot_control.speed_set = 0.0f;
+    shoot_control.speed_set = 0.0f;
 		shoot_control.debug_flag = 2;
     }
 		
     else if (shoot_control.shoot_mode == SHOOT_BULLET)
     {
 		shoot_control.debug_flag = 3;
-        trigger_angle_motor_pid.max_out =  10000.0f;
-        trigger_angle_motor_pid.max_iout = TRIGGER_BULLET_PID_MAX_IOUT;
+        shoot_control.trigger_angle_motor_pid.max_out =  10000.0f;
+        shoot_control.trigger_angle_motor_pid.max_iout = TRIGGER_BULLET_PID_MAX_IOUT;
         shoot_bullet_control();
     }
-    else if (shoot_control.shoot_mode == SHOOT_CONTINUE_BULLET)//英雄不能连发
-    {
-        //设置拨弹轮的拨动速度,并开启堵转反转处理
-			  shoot_control.debug_flag = 4;
-        shoot_control.trigger_speed_set = CONTINUE_TRIGGER_SPEED;
-        trigger_motor_turn_back();
-    }
+
+	
+	
+	
+	
+	
     else if(shoot_control.shoot_mode == SHOOT_DONE)
     {
 				shoot_control.debug_flag = 5;
-        shoot_control.speed_set = -1.0f;
+        shoot_control.set_angle = rad_format(shoot_control.angle-PI_THREE/20.0f);
     }
 
 /*第二个if判断 只区分是否down 如果不down掉就进行控制循环*/
@@ -200,7 +204,7 @@ int16_t shoot_control_loop(void)
 		//------gamggaide-------
 //		else if((shoot_control.shoot_mode == SHOOT_BULLET) &&(shoot_control.block_time < BLOCK_TIME))
 //		{
-//				PID_calc(&trigger_angle_motor_pid,shoot_derta, 1365.3*19/3);
+//				PID_calc(&trigger_angle_motor_pid,shoot_delta, 1365.3*19/3);
 //        shoot_control.given_current = (int16_t)(trigger_angle_motor_pid.out);
 //		}
     else
@@ -208,9 +212,33 @@ int16_t shoot_control_loop(void)
 		shoot_control.fric_state = FRIC_ON;
         shoot_laser_on(); //激光开启
         //计算拨弹轮电机PID
-        PID_calc(&shoot_control.trigger_motor_pid, shoot_control.speed, shoot_control.speed_set);
-        shoot_control.given_current = (int16_t)(shoot_control.trigger_motor_pid.out);
-        if(shoot_control.shoot_mode <= SHOOT_READY_FRIC)//_BULLET)
+//        PID_calc(&shoot_control.trigger_motor_pid, shoot_control.speed, shoot_control.speed_set);
+//        shoot_control.given_current = (int16_t)(shoot_control.trigger_motor_pid.out);
+
+//			if(shoot_i==0)
+//			{
+//		
+
+		shoot_control.speed_set = shoot_PID_calc(&shoot_control.trigger_angle_motor_pid,rad_format(shoot_control.angle),rad_format(shoot_control.set_angle), shoot_control.speed);
+		trigger_motor_turn_back();
+		shoot_control.given_current = PID_calc(&shoot_control.trigger_motor_pid, shoot_control.speed, shoot_control.speed_set);
+		
+		
+//				shoot_flag = 1;
+//			}
+//			if(shoot_flag)
+//			{
+//				shoot_i++;
+//			}
+//			if(shoot_i == 3000)
+//			{
+//				shoot_i=0;
+//				shoot_flag = 0;
+//			}
+////		
+
+
+        if(shoot_control.shoot_mode < SHOOT_READY_FRIC)//_BULLET)
         {
             shoot_control.given_current = 0;
         }
@@ -249,11 +277,13 @@ static void shoot_set_mode(void)
 	}
     else if(shoot_control.shoot_mode == SHOOT_DONE)
 	{
+		shoot_control.block_time = 0;
 		shoot_control.key_time++;
 		if(shoot_control.key_time > SHOOT_DONE_KEY_OFF_TIME)
 		{
 			shoot_control.key_time = 0;
 			shoot_control.shoot_mode = SHOOT_READY_FRIC;
+			
 		}
 	}
 //	if(shoot_control.shoot_mode >= SHOOT_READY_FRIC)
@@ -316,17 +346,35 @@ static void shoot_feedback_update(void)
         shoot_control.ecd_count++;
     }
 
-    if (shoot_control.ecd_count == FULL_COUNT)
-    {
-        shoot_control.ecd_count = -(FULL_COUNT - 1);
-    }
-    else if (shoot_control.ecd_count == -FULL_COUNT)
-    {
-        shoot_control.ecd_count = FULL_COUNT - 1;
-    }
+//    if (shoot_control.ecd_count == FULL_COUNT)
+//    {
+//        shoot_control.ecd_count = -(FULL_COUNT - 1);
+//    }
+//    else if (shoot_control.ecd_count == -FULL_COUNT)
+//    {
+//        shoot_control.ecd_count = FULL_COUNT - 1;
+//    }
+	
+	
+//	if (shoot_control.ecd_count == 19)
+//    {
+//        shoot_control.ecd_count = 0;
+//    }
+
+	
+	
 
     //计算输出轴角度
-    shoot_control.angle = (shoot_control.ecd_count * ECD_RANGE + shoot_control.shoot_motor_measure->ecd) * MOTOR_ECD_TO_ANGLE;
+	shoot_control.angle = shoot_control.ecd_count * ECD_RANGE + shoot_control.shoot_motor_measure->ecd;
+	while(shoot_control.angle>=(8192.0f*3592.0f/187.0f))
+	{
+		shoot_control.angle -= 8192.0f*3592.0f/187.0f;
+	}
+	shoot_control.angle = rad_format(shoot_control.angle*MOTOR_ECD_TO_ANGLE);
+	
+//	
+//    shoot_control.angle = rad_format((shoot_control.ecd_count * ECD_RANGE + shoot_control.shoot_motor_measure->ecd) * MOTOR_ECD_TO_ANGLE);
+//	shoot_control.angle = rad_format((shoot_control.shoot_motor_measure->ecd) * 2.0f*3.1415926f/8192.0f);//MOTOR_ECD_TO_ANGLE;
     //微动开关
     shoot_control.key = BUTTEN_TRIG_PIN;
     //鼠标按键
@@ -396,26 +444,46 @@ static void trigger_motor_turn_back(void)
 {
     if( shoot_control.block_time < BLOCK_TIME)
     {
-        shoot_control.speed_set = shoot_control.trigger_speed_set;
+//		if(shoot_control.move_flag == 0)
+        shoot_control.speed_set = shoot_control.speed_set;
+//		shoot_control.set_angle = shoot_control.set_angle;
     }
     else
     {
-        shoot_control.speed_set = -8.0;
+        shoot_control.speed_set = -1.0;//-3.0;
+//		if(shoot_control.move_flag2 == 0 )
+//		{
+//			shoot_control.set_angle = rad_format(rad_format(shoot_control.set_angle) - 2*PI_THREE);
+//			shoot_control.move_flag2 = 1;
+//		
+//		}
     }
-
-    if(fabs(shoot_control.speed) < BLOCK_TRIGGER_SPEED && shoot_control.block_time < BLOCK_TIME)
-    {
-        shoot_control.block_time++;
-        shoot_control.reverse_time = 0;
-    }
-    else if (shoot_control.block_time == BLOCK_TIME && shoot_control.reverse_time < REVERSE_TIME)
-    {
-        shoot_control.reverse_time++;
-    }
-    else
-    {
-        shoot_control.block_time = 0;
-    }
+	if(fabs(shoot_control.speed) >= BLOCK_TRIGGER_SPEED){
+	}
+	else if(shoot_control.shoot_mode == SHOOT_BULLET)
+	{
+		if(fabs(shoot_control.speed) < BLOCK_TRIGGER_SPEED && shoot_control.block_time < BLOCK_TIME)
+		{
+			
+				shoot_control.block_time++;
+			
+				shoot_control.reverse_time = 0;
+			
+		}
+		else if (shoot_control.block_time == BLOCK_TIME && shoot_control.reverse_time < REVERSE_TIME)
+		{
+			
+				shoot_control.reverse_time++;
+			
+		}
+		else
+		{
+			shoot_control.block_time = 0;
+			shoot_control.shoot_mode = SHOOT_DONE;
+			shoot_control.move_flag = 0;
+	//		shoot_control.move_flag2 = 0;
+		}
+	}
 }
 
 /**
@@ -426,29 +494,55 @@ static void trigger_motor_turn_back(void)
 static void shoot_bullet_control(void)
 {
 	fric_right_motor_last_speed=fric_right_motor.speed;
-    //每次拨动 1/6PI的角度
-    if (shoot_control.move_flag == 0) 
+//	shoot_control.move_time++;
+	
+    //每次拨动 1/3PI的角度
+
+	if (shoot_control.move_flag == 0) 
     {
-        shoot_control.set_angle = rad_format(shoot_control.angle + PI_SIX);
+		shoot_control.set_angle = rad_format(shoot_control.angle + PI_THREE*4.0f/3.0f);
+		
+		shoot_control.angle_begin = shoot_control.set_angle;
+        shoot_control.move_flag2 ++;
         shoot_control.move_flag = 1;
     }
-    if(fric_right_motor.fric_motor_measure->speed_rpm<6000)
+    if(fric_right_motor.fric_motor_measure->speed_rpm<4700)
     {
         shoot_control.shoot_mode = SHOOT_DONE;
+		shoot_control.move_flag = 0;
     }
-    //到达角度判断
-	if(rad_format(shoot_control.set_angle - shoot_control.angle) < 0.05f)
+//    //到达角度判断
+	if((rad_format(shoot_control.set_angle - shoot_control.angle) < 0.1f) && (fabs(shoot_control.speed) < BLOCK_TRIGGER_SPEED))
     {
         shoot_control.shoot_mode = SHOOT_DONE;
+		shoot_control.move_flag = 0;
     }
-    if (rad_format(shoot_control.set_angle - shoot_control.angle) > 0.05f)//没到达一直设置旋转速度
+    if (rad_format(shoot_control.set_angle - shoot_control.angle) > 0.1f)// //yuanlai0.05
     {
-        shoot_control.trigger_speed_set = TRIGGER_SPEED;
-        trigger_motor_turn_back();
+//        shoot_control.trigger_speed_set = TRIGGER_SPEED;
+//        trigger_motor_turn_back();
+//		if(shoot_control.move_flag == 1 && shoot_control.move_flag2 ==0)
+//		{
+//			if(shoot_control.move_time == MOVE_TIME)
+//			{
+//				shoot_control.move_flag = 0;
+//			}
+//		}
     }
-    else
-    {
-        shoot_control.move_flag = 0;
-    }
+//    else
+//    {
+//        shoot_control.move_flag = 0;
+////		shoot_control.move_flag2 = 0;
+////		shoot_control.block_time = 0;
+////		shoot_control.move_time = 0;
+
+//    }
+	
+	
+	
 }
+
+
+
+
 

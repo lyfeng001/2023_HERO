@@ -98,4 +98,6 @@ extern fp32 PID_calc_oldmethod(pid_type_def *pid, fp32 input, fp32 target);
   */
 extern void PID_clear(pid_type_def *pid);
 
+extern fp32 shoot_PID_calc(pid_type_def *pid, fp32 ref, fp32 set, fp32 error_delta);
+
 #endif

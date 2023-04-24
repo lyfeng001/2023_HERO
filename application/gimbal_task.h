@@ -207,7 +207,7 @@
 
 
 #ifdef New_Hero
-#define PITCH_SPEED_PID_KP        5000.0f//2900.0f
+#define PITCH_SPEED_PID_KP        15000.0f//5000.0f//2900.0f
 #define PITCH_SPEED_PID_KI        0.0f//1.0f//25.0f
 #define PITCH_SPEED_PID_KD        0.0f
 #define PITCH_SPEED_PID_MAX_OUT   30000.0f
@@ -246,7 +246,7 @@
 
 //pitch encode angle close-loop PID params, max out and max iout
 //pitch 角度环 角度由编码器 PID参数以及 PID最大输出，积分输出
-#define PITCH_ENCODE_RELATIVE_PID_KP 15.0f
+#define PITCH_ENCODE_RELATIVE_PID_KP 15.0f//15.0f
 #define PITCH_ENCODE_RELATIVE_PID_KI 0.00f
 #define PITCH_ENCODE_RELATIVE_PID_KD 0.0f
 
@@ -282,8 +282,8 @@
 #define YAW_RC_SEN    -0.000005f
 #define PITCH_RC_SEN  0.000006f //0.005
 
-#define YAW_MOUSE_SEN   0.00005f
-#define PITCH_MOUSE_SEN 0.00015f
+#define YAW_MOUSE_SEN   0.000015f//0.00005f
+#define PITCH_MOUSE_SEN 0.00010f//0.00015f
 
 #define YAW_ENCODE_SEN    0.01f
 #define PITCH_ENCODE_SEN  0.01f
@@ -334,16 +334,20 @@
 #define MOTOR_ECD_TO_RAD 0.000766990394f //      2*  PI  /8192
 #endif
 
-#define MIDDLE_YAW    3804//1248//8091//1739
-#define MIDDLE_PITCH  4815//4500
+#define MIDDLE_YAW    3280//6390//3804//1248//8091//1739
+#define MIDDLE_PITCH  1991 //4815//4500
 
-#define MAX_PITCH  5613//2432//4950
-#define MIN_PITCH  4475//2018//4010
+#define MAX_PITCH  2672//5613//2432//4950
+#define MIN_PITCH  1727//4475//2018//4010
 
 //是否有滑环，有为1没有为0
 #define SLIP_RING 1
 
 #endif
+
+#define SWING_LEFT_KEY KEY_PRESSED_OFFSET_Q
+#define SWING_RIGHT_KEY KEY_PRESSED_OFFSET_E
+
 typedef enum
 {
     GIMBAL_MOTOR_RAW = 0, //电机原始值控制
@@ -397,6 +401,7 @@ typedef struct
     fp32 current_set;
     int16_t given_current;
 
+
 } gimbal_motor_t;
 
 typedef struct
@@ -419,6 +424,9 @@ typedef struct
     const fp32 *gimbal_INT_gyro_point;
     gimbal_motor_t gimbal_yaw_motor;
     gimbal_motor_t gimbal_pitch_motor;
+	
+	gimbal_motor_t gimbal_assis_pitch_motor;
+	
     gimbal_step_cali_t gimbal_cali;
 } gimbal_control_t;
 
@@ -445,6 +453,8 @@ extern const gimbal_motor_t *get_yaw_motor_point(void);
   * @retval         pitch
   */
 extern const gimbal_motor_t *get_pitch_motor_point(void);
+
+extern const gimbal_motor_t *get_assis_pitch_motor_point(void);
 
 /**
   * @brief          gimbal task, osDelay GIMBAL_CONTROL_TIME (1ms) 

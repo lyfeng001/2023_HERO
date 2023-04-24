@@ -51,10 +51,10 @@
 #define ECD_RANGE                   8191
 //电机rmp 变化成 旋转速度的比例
 #define MOTOR_RPM_TO_SPEED          0.00290888208665721596153948461415f
-#define MOTOR_ECD_TO_ANGLE          0.000021305288720633905968306772076277f
-#define FULL_COUNT                  18
+#define MOTOR_ECD_TO_ANGLE          0.000039929622401811//0.00004036791547f//0.000021305288720633905968306772076277f
+#define FULL_COUNT                  10//18
 //拨弹速度
-#define TRIGGER_SPEED               5.0f
+#define TRIGGER_SPEED               0.2f//5.0f
 #define CONTINUE_TRIGGER_SPEED      5.0f
 #define READY_TRIGGER_SPEED         5.0f
 
@@ -64,24 +64,25 @@
 
 //卡单时间 以及反转时间
 #define BLOCK_TRIGGER_SPEED         1.0f
-#define BLOCK_TIME                  700
-#define REVERSE_TIME                500
+#define BLOCK_TIME                  700//1500//700
+#define REVERSE_TIME                600//800//500
 #define REVERSE_SPEED_LIMIT         13.0f
+#define MOVE_TIME                   1500
 
 #define PI_FOUR                     0.78539816339744830961566084581988f
 #define PI_TEN                      0.314f
 #define PI_SEVEN					0.897f
-#define PI_SIX						0.53f
+#define PI_THREE						1.047197551196597746f//1.02f
 
 #ifdef Old_Hero
 //拨弹轮电机PID
-#define TRIGGER_SPEED_PID_KP        400.0f
-#define TRIGGER_SPEED_PID_KI        0.5f
+#define TRIGGER_SPEED_PID_KP        500.0f
+#define TRIGGER_SPEED_PID_KI        0.0f
 #define TRIGGER_SPEED_PID_KD        0.0f
 
-#define TRIGGER_ANGLE_PID_KP        1.0f
-#define TRIGGER_ANGLE_PID_KI        0.5f
-#define TRIGGER_ANGLE_PID_KD        0.0f
+#define TRIGGER_ANGLE_PID_KP        40.0f
+#define TRIGGER_ANGLE_PID_KI        0.0f
+#define TRIGGER_ANGLE_PID_KD        -5.0f
 
 #define TRIGGER_BULLET_PID_MAX_OUT  10000.0f
 #define TRIGGER_BULLET_PID_MAX_IOUT 9000.0f
@@ -92,13 +93,13 @@
 #endif
 
 #ifdef New_Hero                                     //新英雄！！的拨弹轮pid
-#define TRIGGER_SPEED_PID_KP        400.0f
-#define TRIGGER_SPEED_PID_KI        0.5f
+#define TRIGGER_SPEED_PID_KP        100.0f
+#define TRIGGER_SPEED_PID_KI        0.0f
 #define TRIGGER_SPEED_PID_KD        0.0f
 
-#define TRIGGER_ANGLE_PID_KP        1.0f
-#define TRIGGER_ANGLE_PID_KI        0.5f
-#define TRIGGER_ANGLE_PID_KD        0.0f
+#define TRIGGER_ANGLE_PID_KP        66.0f//37.0f
+#define TRIGGER_ANGLE_PID_KI        0.0f
+#define TRIGGER_ANGLE_PID_KD        -6.0f//-4.1f
 
 #define TRIGGER_BULLET_PID_MAX_OUT  10000.0f
 #define TRIGGER_BULLET_PID_MAX_IOUT 9000.0f
@@ -163,11 +164,13 @@ typedef struct
     ramp_function_source_t fric2_ramp;
     uint16_t fric_pwm2;
     pid_type_def trigger_motor_pid;
+	pid_type_def trigger_angle_motor_pid;
     fp32 trigger_speed_set;
     fp32 speed;
     fp32 speed_set;
     fp32 angle;
     fp32 set_angle;
+	fp32 angle_begin;
     int16_t given_current;
     int8_t ecd_count;
 	
@@ -179,11 +182,12 @@ typedef struct
     uint16_t press_l_time;
     uint16_t press_r_time;
     uint16_t rc_s_time;
-
+	
+	uint16_t move_time;
     uint16_t block_time;
     uint16_t reverse_time;
     bool_t move_flag;
-
+	bool_t move_flag2;
     bool_t key;
     uint8_t key_time;
 
